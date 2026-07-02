@@ -1,0 +1,337 @@
+
+
+
+## 主车队清障（CLEAR）
+
+```json
+{
+  "action": "CLEAR",
+  "targetNodeId": "S08"
+}
+```
+
+主车队清障（CLEAR）速查：
+
+| 场景 | 服务端处理 | 客户端处理 |
+| --- | --- | --- |
+| 目标是当前位置或相邻节点，且目标有障碍 | 进入清障读条 | 继续发送 `WAIT` 或 `actions: []` |
+| 清障完成 | 下发 `OBSTACLE_CLEAR` | 重新读取 `nodes[]` |
+| 从相邻节点清障 | 只清障，不自动移动 | 清障后仍需再发 `MOVE` |
+| 想完成清障类皇榜任务 | 不能只发 `CLEAR` | 对 `inquire.tasks[]` 中的任务发 `CLAIM_TASK` |
+
+常见失败：
+
+| 服务端反馈 | 含义 |
+| --- | --- |
+| `TARGET_NOT_FOUND` | 目标节点不存在 |
+| `TARGET_NOT_REACHABLE` | 目标不是当前位置或相邻节点 |
+| `OBSTACLE_NOT_FOUND` | 目标没有障碍 |
+| `RESOURCE_NOT_ENOUGH` | 好果不足 |
+| `SAFE_ZONE_FORBIDDEN` | 当前安全区规则禁止该动作 |
+
+## 处理皇榜任务（CLAIM_TASK）
+
+```json
+{
+  "action": "CLAIM_TASK",
+  "taskId": "T01_100_01"
+}
+```
+
+## 宫门验核（VERIFY_GATE）
+
+```json
+{
+  "action": "VERIFY_GATE",
+  "targetNodeId": "S14",
+  "rushTactic": "BREAK_ORDER"
+}
+```
+
+宫门验核（VERIFY_GATE）只允许在 `inquire.phase = "RUSH"` 后提交；普通阶段提交会被拒绝，不创建宫门窗口，不进入验核读条。
+
+## 小分队探路（SQUAD_SCOUT）
+
+```json
+{
+  "action": "SQUAD_SCOUT",
+  "targetNodeId": "S10"
+}
+```
+
+## 小分队清障（SQUAD_CLEAR）
+
+```json
+{
+  "action": "SQUAD_CLEAR",
+  "targetNodeId": "S08"
+}
+```
+
+## 小分队增援（SQUAD_REINFORCE）
+
+```json
+{
+  "action": "SQUAD_REINFORCE",
+  "targetNodeId": "S10"
+}
+```
+
+## 小分队削弱（SQUAD_WEAKEN）
+
+```json
+{
+  "action": "SQUAD_WEAKEN",
+  "targetNodeId": "S10"
+}
+```
+
+## 窗口出牌（WINDOW_CARD）
+
+```json
+{
+  "action": "WINDOW_CARD",
+  "contestId": "C_123",
+  "card": "BING_ZHENG"
+}
+```
+
+card 枚举：
+
+| card | 中文含义 | 说明 |
+|---|---|---|
+| 验牒（YAN_DIE） | 验牒 | 消耗过所或官凭，偏通行与文书核验 |
+| 强行（QIANG_XING） | 强行 | 消耗马类资源或疾行令，偏速度突破 |
+| 献贡（XIAN_GONG） | 献贡 | 消耗好果并要求高鲜度，偏贡品品质 |
+| 兵争（BING_ZHENG） | 兵争 | 消耗护卫行动点，偏护卫对抗 |
+| 弃权（ABSTAIN） | 弃权 | 不出牌，不克制任何牌 |
+
+## 疾行令（RUSH_SPEED）
+
+```json
+{
+  "action": "RUSH_SPEED"
+}
+```
+
+疾行令（RUSH_SPEED）语义：
+
+规则见本节“急策通用规则”。补充：疾行令与快马、短程马等马类移动增益冲突，冲突时返回`HORSE_BUFF_CONFLICT`。
+
+## 护果令（RUSH_PROTECT）
+
+```json
+{
+  "action": "RUSH_PROTECT"
+}
+```
+
+护果令（RUSH_PROTECT）语义：
+
+规则见本节“急策通用规则”。客户端可根据 `players[].rushTacticUsedCount` 判断是否还能提交。
+
+## 破关令（BREAK_ORDER）
+
+```json
+{
+  "action": "BREAK_GUARD",
+  "targetNodeId": "S10",
+  "goodFruit": 1,
+  "badFruit": 1,
+  "rushTactic": "BREAK_ORDER"
+}
+```
+
+破关令（BREAK_ORDER）语义：
+
+规则见本节“急策通用规则”。客户端不得发送 `{"action":"BREAK_ORDER"}`。
+
+## 急策通用规则
+
+急策通用规则：
+
+- 急策只在 `phase = RUSH` 宫宴冲刺阶段使用。
+- 同一队伍的急策次数受 `players[].rushTacticUsedCount` 和规则配置限制。
+- 同一帧最多提交 1 个终局急策。
+- `BREAK_ORDER` 不作为独立动作发送，只能通过 `rushTactic: "BREAK_ORDER"` 绑定到攻坚或宫门验核等合法动作。
+
+---
+
+# 附录 F. events[] 事件说明
+
+| 字段 | 类型 | 中文名 | 说明 |
+| --------- | --- | ------------ | -------------------------------------- |
+| `eventId` | String | 事件 ID | 格式类似 `EV_001_001` |
+| `type` | String | 事件类型 | 如移动、读条、窗口、任务、资源、拒绝等 |
+| `round` | Int | 事件发生回合 | 事件属于哪一回合 |
+| `payload` | Object | 事件载荷 | 不同事件类型字段不同 |
+
+## events[].payload 常见字段字典
+
+`payload` 是动态对象。客户端先读 `events[].type`，再按事件类型读取需要的字段，不要假设每个事件都有同一套字段。
+
+常用字段优先读取：
+
+| 字段 | 类型 | 用途 | 说明 |
+| --- | --- | --- | --- |
+| `playerId` | Int | 关联玩家 | 触发或关联该事件的玩家编号 |
+| `teamId` | String | 关联队伍 | 触发或关联该事件的队伍编号 |
+| `nodeId` | String | 发生站点 | 到站、领取、验核、探路等事件常用 |
+| `targetNodeId` | String | 目标站点 | 动作、窗口、设卡、清障等事件常用 |
+| `errorCode` | String | 错误码 | `ACTION_REJECTED`、`INVALID_ACTION` 常用 |
+| `contestId` | String | 窗口编号 | 窗口开始、出牌、结束等事件常用 |
+| `taskId` | String | 任务编号 | 皇榜任务事件常用 |
+| `resourceType` | String | 资源类型 | 资源领取、使用、奖励事件常用 |
+| `score` | Int | 分数 | 任务、悬赏、交付等事件常用 |
+| `reason` | String | 原因 | 仅部分过期/失效事件携带，例如 `TASK_EXPIRE`、`TASK_TARGET_LOST`、`BOUNTY_EXPIRE`；动作拒绝看 `errorCode` |
+| `orderId` | String | 小分队订单 | `SQUAD_DISPATCH`、小分队生效或失败事件常用 |
+| `expireRound` | Int | 过期帧 | 探路标记、任务、悬赏等对象的过期结算帧 |
+
+进阶字段按需读取：
+
+| 字段 | 类型 | 用途 | 说明 |
+| --- | --- | --- | --- |
+| `fromNodeId` / `toNodeId` | String | 移动 | 路线起点和终点 |
+| `routeEdgeId` | String | 移动 | 当前移动所在路线边 |
+| `progress` | Number | 移动 | 当前路线推进比例 |
+| `edgeProgressMs` / `edgeTotalMs` | Long | 移动 | 已推进时间 / 总时间 |
+| `winnerTeamId` / `winner` | String | 窗口 | 窗口最终胜方 / 本拍胜方 |
+| `redPoint` / `bluePoint` | Int | 窗口 | 红蓝双方窗口胜点 |
+| `redCard` / `blueCard` | String | 窗口 | 本拍双方窗口牌 |
+| `roundIndex` / `totalRounds` | Int | 窗口 | 当前拍 / 总拍数 |
+| `suppressUntilRound` | Int | 平局抑制 | 同对象冷却截止回合 |
+| `objectKey` | String | 公共对象 | 服务端标识节点、资源、任务或窗口的 key |
+| `processType` | String | 读条 | 当前处理流程类型 |
+| `remainRound` | Int | 状态 | 天气、读条、抑制等剩余回合 |
+| `weatherId` / `region` | String | 天气 | 天气编号和影响区域 |
+| `routeType` | String | 路线 | 事件关联路线类型 |
+| `action` / `actionCount` | String / Int | 动作 | 被拒绝动作或违规动作数量 |
+| `defense` / `maxDefense` | Int | 设卡 | 当前防御值 / 最大防御值 |
+| `blockType` / `timeTax` | String / Int | 强制通行 | 阻挡类型 / 时间税 |
+| `goodFruit` / `badFruit` / `freshness` | Number | 交付与成本 | 事件后的果品状态 |
+| `totalScore` / `scoreDelta` | Int | 分数 | 当前总分或分数变化 |
+| `ownerPlayerId` / `ownerTeamId` | Int / String | 归属 | 对象、任务、资源或设卡归属 |
+| `resourceDelta` | Int | 资源 | 资源增加或减少数量 |
+| `buffType` | String | 增益 | 新增、覆盖或生效的增益类型 |
+| `remainingTriggers` | Int | 效果次数 | 探路、护果、设卡等效果剩余触发次数 |
+## events[].payload 事件类型说明
+
+客户端按 `events[].type` 识别事件，再按需读取 `payload`。本节只保留三个最常用的判断样例；完整事件枚举见下方“事件类型总表”。
+
+**示例一：动作成功**
+
+```json
+{
+  "type": "TASK_COMPLETE",
+  "round": 123,
+  "payload": {
+    "playerId": 1111,
+    "taskId": "T01_100_01",
+    "score": 30,
+    "taskScore": 60
+  }
+}
+```
+
+客户端处理：更新任务分，并在下一帧重新读取 `players[].taskScore` 和 `inquire.tasks[]`。
+
+**示例二：动作被拒绝**
+
+```json
+{
+  "type": "ACTION_REJECTED",
+  "round": 124,
+  "payload": {
+    "playerId": 1111,
+    "action": "DELIVER",
+    "errorCode": "DELIVER_NOT_VERIFIED"
+  }
+}
+```
+
+客户端处理：读取 `errorCode`，修正策略；例如先完成宫门验核，再尝试交付。
+
+**示例三：窗口争夺**
+
+```json
+{
+  "type": "WINDOW_CONTEST_START",
+  "round": 130,
+  "payload": {
+    "contestId": "C_130_001",
+    "contestType": "RESOURCE",
+    "targetNodeId": "S07",
+    "resourceType": "SHORT_HORSE"
+  }
+}
+```
+
+客户端处理：下一帧读取 `contests[]`，对应 `contestId` 提交 `WINDOW_CARD`；未出牌会按弃权处理。
+
+## 事件类型总表
+
+| 事件类型 | 中文含义 | 客户端处理建议 |
+|---|---|---|
+| `WAIT` | 等待生效 | 可作为正常心跳或主动等待结果 |
+| `MOVE_PROGRESS` | 移动推进 | 更新路线进度，未必已经到站 |
+| `NODE_ENTER` | 进入站点 | 主车队到达 `payload.nodeId` 后再判断资源、任务和处理 |
+| `PROCESS_PROGRESS` | 读条推进 | 继续等待当前 `currentProcess` |
+| `PROCESS_COMPLETE` | 读条完成 | 结合资源、任务、验核、清障等事件确认收益 |
+| `ACTION_REJECTED` | 业务拒绝 | 读取 `payload.errorCode`，通常不计非法动作 |
+| `INVALID_ACTION` | 非法动作 | 读取 `payload.errorCode`，可能计入非法动作或惩罚 |
+| `RESOURCE_CLAIM` | 资源领取完成 | 更新本方资源和站点库存 |
+| `RESOURCE_USE` | 资源使用完成 | 更新本方资源、增益或鲜度状态 |
+| `TASK_REFRESH` | 皇榜任务刷新 | 重新读取 `inquire.tasks[]` |
+| `TASK_COMPLETE` | 皇榜任务完成 | 更新任务分和任务状态 |
+| `TASK_EXPIRE` | 皇榜任务过期 | 从可选任务中移除 |
+| `TASK_PROTECTION_START` | 任务胜方保护开始 | 保护期内非保护方不要重复抢同一任务 |
+| `TASK_TARGET_LOST` | 任务目标失效 | 重新规划任务目标 |
+| `WINDOW_CONTEST_START` | 窗口争夺开始 | 下一帧起关注 `contests[]` 并决定是否出牌 |
+| `WINDOW_CARD_REVEAL` | 窗口牌揭示 | 用于复盘双方出牌 |
+| `WINDOW_CONTEST_END` | 窗口争夺结束 | 读取胜负、胜点和后续状态 |
+| `WINDOW_CONTEST_DRAW` | 窗口平局 | 双方通常进入休整或对象冷却 |
+| `WINDOW_CONTEST_REPEAT_SUPPRESSED` | 重复平局被抑制 | 换目标、错峰或等待冷却结束 |
+| `RESOURCE_CONTEST_WIN` | 资源窗口胜出 | 胜方后续仍需按规则完成领取 |
+| `TASK_CONTEST_WIN` | 任务窗口胜出 | 胜方获得任务处理资格或进入处理 |
+| `GATE_CONTEST_WIN` | 宫门窗口胜出 | 胜方进入或继续宫门验核 |
+| `PASS_CONTEST_WIN` | 通行窗口攻方胜出 | 攻方继续强制通行 |
+| `PASS_CONTEST_DEFENDED` | 通行窗口守方守住 | 攻方失败或承担对应代价 |
+| `OBSTACLE_CONTEST_WIN` | 清障窗口胜出 | 胜方获得清障处理资格 |
+| `DOCK_CONTEST_WIN` | 码头窗口胜出 | 胜方获得码头处理资格 |
+| `GUARD_SET` | 设卡完成 | 更新目标节点设卡状态 |
+| `GUARD_BREAK` | 攻坚破卡完成 | 更新目标节点设卡状态和悬赏 |
+| `FORCED_PASS_START` | 强制通行开始 | 进入 `FORCED_PASSING` 读条 |
+| `FORCED_PASS_RECALCULATE` | 强制通行税重算 | 根据当前 `currentProcess` 继续等待或改策略 |
+| `FORCED_PASS_END` | 强制通行结束 | 重新读取当前位置和阻挡状态 |
+| `BOUNTY_CREATE` | 悬赏创建 | 可考虑攻坚或争夺关键关口 |
+| `BOUNTY_CLAIM` | 悬赏领取 | 更新悬赏分 |
+| `BOUNTY_EXPIRE` | 悬赏过期 | 从可选悬赏中移除 |
+| `RUSH_START` | 宫宴冲刺开始 | 可提交宫门验核和终局急策 |
+| `RUSH_TACTIC_USE` | 终局急策使用 | 更新急策次数和资源成本 |
+| `VERIFY_GATE_COMPLETE` | 宫门验核完成 | 可以规划前往终点交付 |
+| `DELIVER_SUCCESS` | 交付成功 | 锁定交付帧、好果和鲜度 |
+| `POST_DELIVER_PENALTY` | 交付后违规扣分 | 交付后只提交 `WAIT`、`actions: []` 或重复 `DELIVER` |
+| `FRESHNESS_DROP` | 鲜度下降 | 更新交付质量预估 |
+| `GOOD_TO_BAD` | 好果转坏果 | 更新好果、坏果数量 |
+| `GOOD_FRUIT_SCRAP` | 好果报废 | 鲜度归零后剩余好果不可再用 |
+| `COST_BANKRUPT` | 成本导致资源破产 | 降低消耗型动作优先级 |
+| `DISCONNECT_WARNING` | 失联警告 | 检查客户端是否持续发送有效心跳 |
+| `PLAYER_RETIRED` | 玩家退赛 | 进入退赛结算逻辑 |
+| `BREAK_ORDER_BIND` | 破关令绑定 | 更新本帧急策使用判断；通常只需记录 |
+| `BUFF_OVERWRITE` | 增益覆盖 | 重新读取 `players[].buffs` 和移动增益 |
+| `GUARD_WEATHERING` | 设卡耐久衰减 | 重新读取目标节点 `guard` 状态 |
+| `OBSTACLE_CLEAR` | 障碍清除完成 | 重新读取目标节点障碍状态 |
+| `OBSTACLE_RESIDUAL_TAX` | 障碍残余通行税 | 强制通行或路线规划时考虑额外代价 |
+| `RETIREMENT_CLEANUP` | 退赛清理 | 清理退赛玩家相关占用或争夺状态 |
+| `SCOUT_MARKER_ADD` | 探路标记新增 | 更新节点探路标记 |
+| `SCOUT_MARKER_APPLY` | 探路标记生效 | 处理对应节点的探路加成 |
+| `SCOUT_MARKER_CONSUME` | 探路标记消耗 | 重新读取节点探路状态 |
+| `SCOUT_MARKER_EXPIRE` | 探路标记过期 | 移除本地过期探路标记 |
+| `SQUAD_DISPATCH` | 小分队派出 | 更新小分队可用数量和在途状态 |
+| `SQUAD_SCOUT` | 小分队探路生效 | 读取 `orderId`、`playerId`、`targetNodeId`、`hasObstacle`、`resourceStock`、`guard` |
+| `SQUAD_CLEAR` | 小分队清障生效 | 读取 `orderId`、`playerId`、`targetNodeId`，并重新读取目标节点障碍状态 |
+| `SQUAD_REINFORCE` | 小分队增援生效 | 读取 `orderId`、`playerId`、`targetNodeId`、`before`、`after` |
+| `SQUAD_WEAKEN` | 小分队削弱生效 | 读取 `orderId`、`playerId`、`targetNodeId`、`before`、`after` |
+| `SQUAD_FAILED` | 小分队行动失败 | 服务端仅下发 `orderId`、`action`、`targetNodeId`结合下一帧 `nodes[]` 推断 |
+| `VERIFY_GATE_ALREADY_DONE` | 宫门已验核 | 视为无需重复验核，规划前往终点 |
+| `WINDOW_EFFECTIVE_COMBAT` | 窗口有效对抗 | 复盘或统计用，策略可忽略 |
