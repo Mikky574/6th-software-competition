@@ -1,4 +1,8 @@
-# Main entry for baseline agent
+import sys
+import os
+
+# ensure project root is in python path
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from src.agent.baseline_agent import BaselineAgent
 from src.protocol.adapter import ProtocolAdapter
