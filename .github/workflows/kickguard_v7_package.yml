@@ -1,0 +1,26 @@
+name: KickGuard V7 Package
+
+on:
+  push:
+    branches:
+      - kickguard-temporal-graph-v7
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check
+        run: python -m py_compile KickGuard_TemporalGraph_V7/kickguard_v7.py
+      - name: Create ZIP
+        run: zip -r KickGuard_TemporalGraph_V7.zip KickGuard_TemporalGraph_V7
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: KickGuard_TemporalGraph_V7
+          path: KickGuard_TemporalGraph_V7.zip
+          if-no-files-found: error
