@@ -1,0 +1,1 @@
+V10 strict LOSO note: router feature selection and router centroids must be fitted inside each leave-one-well-out fold using training wells only. The final test fit may use all 10 wells.
